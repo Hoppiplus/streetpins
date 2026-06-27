@@ -1,97 +1,45 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  --brand-bg:     #0e0e1a;
+  --brand-card:   #16162a;
+  --brand-border: rgba(255, 255, 255, 0.08);
+  --brand-accent: #7c6aff;
+  --brand-muted:  #8888aa;
+  --brand-gold:   #f5c542;
+  --brand-text:   #f0f0ff;
 }
 
-* {
-  box-sizing: border-box;
-}
+* { box-sizing: border-box; }
 
-html,
+html, body, #__next { height: 100%; }
+
 body {
-  height: 100%;
-  margin: 0;
-  padding: 0;
-  background-color: #0f0f14;
-  color: #e8e8f0;
-  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--brand-bg);
+  color: var(--brand-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
 }
 
-#__next,
-main {
-  height: 100%;
+/* Scrollbar styling */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+/* Hide scrollbar but keep scroll */
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+.no-scrollbar::-webkit-scrollbar { display: none; }
+
+/* Line clamp utilities */
+.line-clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-/* Hide Google Maps default UI chrome we don't want */
-.gm-bundled-control-on-bottom,
-.gm-svpc {
-  opacity: 0.7 !important;
-}
-
-/* Autocomplete dropdown dark theme */
-.pac-container {
-  background: #1e1e2a;
-  border: 1px solid #2a2a3a;
-  border-radius: 0.5rem;
-  margin-top: 4px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-  font-family: 'Inter', system-ui, sans-serif;
-}
-
-.pac-item {
-  padding: 8px 12px;
-  color: #8888a8;
-  border-top: 1px solid #2a2a3a;
-  cursor: pointer;
-  font-size: 0.8125rem;
-}
-
-.pac-item:hover,
-.pac-item-selected {
-  background: #2a2a3a;
-  color: #e8e8f0;
-}
-
-.pac-item-query {
-  color: #e8e8f0;
-  font-size: 0.875rem;
-}
-
-.pac-matched {
-  color: #6c63ff;
-  font-weight: 600;
-}
-
-.pac-icon {
-  display: none;
-}
-
-/* Custom scrollbar */
-::-webkit-scrollbar {
-  width: 4px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: #2a2a3a;
-  border-radius: 2px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #3a3a50;
-}
-
-/* Range input */
-input[type='range'] {
-  cursor: pointer;
-}
-
-/* Waving bars animation for sound viz */
-@keyframes wave {
-  0%, 100% { transform: scaleY(0.5); }
-  50% { transform: scaleY(1); }
-}
+/* Smooth transitions */
+button, a { transition: all 0.15s ease; }

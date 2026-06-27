@@ -1,10 +1,11 @@
-﻿import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import type { PovType, TimeOfDay, VideoResult } from '@/lib/types';
 import { POV_OPTIONS, TIME_OPTIONS } from '@/lib/types';
 
 const YT_BASE = 'https://www.googleapis.com/youtube/v3';
 
-// Infer a POV type from a video title / description
+// ─── POV inference ────────────────────────────────────────────────────────
+
 function inferPov(title: string, description: string): PovType {
   const text = (title + ' ' + description).toLowerCase();
   if (/dashcam|driving|drive through|car pov|berkendara/.test(text)) return 'car';
@@ -15,23 +16,11 @@ function inferPov(title: string, description: string): PovType {
   return 'walking';
 }
 
-/**
- * Extract 2-3 meaningful place-name tokens from a Google geocoder label.
- * e.g. "Jl. Sawo No.26, RT.4/RW.2, Gondangdia, Kec. Menteng, Kota Jakarta Pusat, ..."
- *   -> "Gondangdia Kec. Menteng Jakarta Pusat"
- *
- * Fixes:
- *  - Skip RT/RW codes (RT.4/RW.2 etc.) — meaningless to YouTube
- *  - Skip segments containing embedded postal codes
- *  - Skip province-level segments (Daerah Khusus Ibukota...)
- *  - Strip "Kota " prefix so "Kota Jakarta Pusat" -> "Jakarta Pusat"
- *  - Take up to 3 parts so the city name is included
- */
+// ─── Area name extraction ─────────────────────────────────────────────────
+
 function extractAreaName(label: string): string {
   if (!label) return 'Jakarta';
-
   const parts = label.split(',').map((s) => s.trim()).filter((s) => s.length > 1);
-
   const SKIP_EXACT = new Set([
     'indonesia', 'dki jakarta', 'jawa barat', 'jawa tengah', 'jawa timur',
     'banten', 'bali', 'sumatera utara', 'sulawesi selatan',
@@ -54,31 +43,32 @@ function extractAreaName(label: string): string {
         p.length < 60
       );
     })
-    // Strip "Kota " prefix -> "Kota Jakarta Pusat" becomes "Jakarta Pusat"
     .map((p) => p.replace(/^kota\s+/i, '').trim());
 
-  // Skip leading street segment
   const start = meaningful[0] && STREET_PREFIX.test(meaningful[0]) ? 1 : 0;
-
-  // Take neighbourhood + district + city (up to 3 parts)
-  const selected = meaningful.slice(start, start + 3);
-  return selected.join(' ') || 'Jakarta';
+  return meaningful.slice(start, start + 3).join(' ') || 'Jakarta';
 }
 
-/**
- * Build a tight YouTube search query targeting POV street footage.
- */
+// ─── Query builder ─────────────────────────────────────────────────────────
+
 function buildQuery(
   areaName: string,
-  povOption: (typeof POV_OPTIONS)[0],
-  timeOption: (typeof TIME_OPTIONS)[0]
+  povOption: typeof POV_OPTIONS[0],
+  timeOption: typeof TIME_OPTIONS[0],
+  mode: string
 ): string {
-  const povSignal =
-    povOption.id === 'all' ? 'POV street walking tour OR dashcam' : povOption.searchTerms[0];
-  const timePart = timeOption.searchTerms[0] ?? '';
-  const parts = [areaName, povSignal, timePart].filter(Boolean);
-  return parts.join(' ');
+  if (mode === 'memory') {
+    // Memory Walk: nostalgia footage, not strict POV
+    return `${areaName} street footage tour`;
+  }
+  const povSignal = povOption.id === 'all'
+    ? 'POV street walking tour OR dashcam'
+    : (povOption.keywords[0] ?? 'street');
+  const timePart = timeOption.keywords[0] ?? '';
+  return [areaName, povSignal, timePart].filter(Boolean).join(' ');
 }
+
+// ─── Main handler ─────────────────────────────────────────────────────────
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
@@ -88,6 +78,11 @@ export async function GET(req: NextRequest) {
   const label = searchParams.get('label') ?? '';
   const pov = (searchParams.get('pov') ?? 'all') as PovType;
   const time = (searchParams.get('time') ?? 'all') as TimeOfDay;
+  const mode = searchParams.get('mode') ?? 'streets'; // 'streets' | 'memory'
+
+  // Year range for Memory Walk (maps to publishedAfter / publishedBefore)
+  const yearFrom = searchParams.get('yearFrom');
+  const yearTo = searchParams.get('yearTo');
 
   if (!lat || !lng) {
     return NextResponse.json({ error: 'lat and lng are required' }, { status: 400 });
@@ -102,23 +97,31 @@ export async function GET(req: NextRequest) {
   const timeOption = TIME_OPTIONS.find((t) => t.id === time) ?? TIME_OPTIONS[0];
 
   const areaName = extractAreaName(label);
-  const query = buildQuery(areaName, povOption, timeOption);
+  const query = buildQuery(areaName, povOption, timeOption, mode);
 
-  console.log('[youtube] query:', query, '| label:', label);
+  console.log('[youtube] mode:', mode, '| query:', query, '| years:', yearFrom, '-', yearTo);
 
-  const params = new URLSearchParams({
+  const params: Record<string, string> = {
     part: 'snippet',
     type: 'video',
     q: query,
     maxResults: '20',
-    order: 'relevance',
+    order: mode === 'memory' ? 'date' : 'relevance',
     videoEmbeddable: 'true',
     videoDuration: 'any',
     relevanceLanguage: 'id',
     key: apiKey,
-  });
+  };
 
-  const searchUrl = `${YT_BASE}/search?${params}`;
+  // Add year-range filters for Memory Walk
+  if (yearFrom) {
+    params.publishedAfter = `${yearFrom}-01-01T00:00:00Z`;
+  }
+  if (yearTo) {
+    params.publishedBefore = `${yearTo}-12-31T23:59:59Z`;
+  }
+
+  const searchUrl = `${YT_BASE}/search?${new URLSearchParams(params)}`;
 
   try {
     const searchRes = await fetch(searchUrl, { next: { revalidate: 300 } });
@@ -130,47 +133,47 @@ export async function GET(req: NextRequest) {
 
     const searchData = await searchRes.json();
 
-    // Filter for POV/street content
     const POV_MUST_MATCH =
       /pov|walking|walk|dashcam|drive|driving|motorbike|motorcycle|ojek|scooter|krl|mrt|lrt|jalan-jalan|tour|street|riding|naik|berkendara|first.?person/i;
 
-    const items: VideoResult[] = (searchData.items ?? [])
-      .filter((item: any) => {
-        const title = item.snippet.title ?? '';
-        const desc = item.snippet.description ?? '';
-        return POV_MUST_MATCH.test(title) || POV_MUST_MATCH.test(desc);
-      })
-      .map((item: any) => ({
-        id: item.id.videoId,
-        title: item.snippet.title,
-        channelTitle: item.snippet.channelTitle,
-        publishedAt: item.snippet.publishedAt,
-        thumbnail:
-          item.snippet.thumbnails?.medium?.url ??
-          item.snippet.thumbnails?.default?.url ??
-          '',
-        description: item.snippet.description ?? '',
-        povType: inferPov(item.snippet.title, item.snippet.description ?? ''),
-      }));
+    const mapItem = (item: any): VideoResult => ({
+      id: item.id.videoId,
+      title: item.snippet.title,
+      channelTitle: item.snippet.channelTitle,
+      publishedAt: item.snippet.publishedAt,
+      thumbnail:
+        item.snippet.thumbnails?.medium?.url ??
+        item.snippet.thumbnails?.default?.url ??
+        '',
+      description: item.snippet.description ?? '',
+      povType: inferPov(item.snippet.title, item.snippet.description ?? ''),
+      publishedYear: item.snippet.publishedAt
+        ? new Date(item.snippet.publishedAt).getFullYear()
+        : undefined,
+    });
 
-    // Fall back to unfiltered if strict filter removed everything
-    const fallback =
-      items.length === 0
-        ? (searchData.items ?? []).map((item: any) => ({
-            id: item.id.videoId,
-            title: item.snippet.title,
-            channelTitle: item.snippet.channelTitle,
-            publishedAt: item.snippet.publishedAt,
-            thumbnail:
-              item.snippet.thumbnails?.medium?.url ??
-              item.snippet.thumbnails?.default?.url ??
-              '',
-            description: item.snippet.description ?? '',
-            povType: inferPov(item.snippet.title, item.snippet.description ?? ''),
-          }))
-        : items;
+    let items: VideoResult[];
 
-    return NextResponse.json({ items: fallback, totalResults: fallback.length });
+    if (mode === 'memory') {
+      // Memory Walk: no strict POV filter, include all relevant footage
+      items = (searchData.items ?? []).map(mapItem);
+    } else {
+      // Streets mode: filter for POV / street content
+      items = (searchData.items ?? [])
+        .filter((item: any) => {
+          const title = item.snippet.title ?? '';
+          const desc = item.snippet.description ?? '';
+          return POV_MUST_MATCH.test(title) || POV_MUST_MATCH.test(desc);
+        })
+        .map(mapItem);
+
+      // Fall back to unfiltered if strict filter removed everything
+      if (items.length === 0) {
+        items = (searchData.items ?? []).map(mapItem);
+      }
+    }
+
+    return NextResponse.json({ items, totalResults: items.length });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

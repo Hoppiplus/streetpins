@@ -1,62 +1,80 @@
 'use client';
-
 import { useState, useCallback } from 'react';
 import type { VideoResult, PovType, TimeOfDay } from '@/lib/types';
 
 interface SearchOptions {
   lat: number;
   lng: number;
-  label?: string; // reverse-geocoded place name — used to build a tight search query
-  radiusMeters: number;
-  pov: PovType;
-  time: TimeOfDay;
+  label: string;
+  pov?: PovType;
+  time?: TimeOfDay;
+  mode?: 'streets' | 'memory';
+  yearFrom?: number;
+  yearTo?: number;
 }
 
-interface UseYouTubeSearchReturn {
-  videos: VideoResult[];
+interface YouTubeState {
+  items: VideoResult[];
   loading: boolean;
   error: string | null;
-  search: (opts: SearchOptions) => Promise<void>;
-  clear: () => void;
+  currentIndex: number;
 }
 
-export function useYouTubeSearch(): UseYouTubeSearchReturn {
-  const [videos, setVideos] = useState<VideoResult[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+export function useYouTubeSearch() {
+  const [state, setState] = useState<YouTubeState>({
+    items: [],
+    loading: false,
+    error: null,
+    currentIndex: 0,
+  });
 
   const search = useCallback(async (opts: SearchOptions) => {
-    setLoading(true);
-    setError(null);
+    const {
+      lat, lng, label,
+      pov = 'all',
+      time = 'all',
+      mode = 'streets',
+      yearFrom,
+      yearTo,
+    } = opts;
 
-    const params = new URLSearchParams({
-      lat: String(opts.lat),
-      lng: String(opts.lng),
-      radius: String(opts.radiusMeters),
-      pov: opts.pov,
-      time: opts.time,
-      ...(opts.label ? { label: opts.label } : {}),
-    });
+    setState((s) => ({ ...s, loading: true, error: null }));
 
     try {
+      const params = new URLSearchParams({
+        lat: lat.toString(),
+        lng: lng.toString(),
+        label,
+        pov,
+        time,
+        mode,
+      });
+      if (yearFrom) params.set('yearFrom', yearFrom.toString());
+      if (yearTo) params.set('yearTo', yearTo.toString());
+
       const res = await fetch(`/api/youtube?${params}`);
       const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error ?? 'Search failed');
-      }
-      setVideos(data.items ?? []);
+      if (!res.ok) throw new Error(data.error ?? 'Failed to fetch videos');
+      setState({ items: data.items ?? [], loading: false, error: null, currentIndex: 0 });
     } catch (e: any) {
-      setError(e.message ?? 'Unknown error');
-      setVideos([]);
-    } finally {
-      setLoading(false);
+      setState((s) => ({ ...s, loading: false, error: e.message }));
     }
   }, []);
 
-  const clear = useCallback(() => {
-    setVideos([]);
-    setError(null);
+  const setIndex = useCallback((i: number) => {
+    setState((s) => ({ ...s, currentIndex: Math.max(0, Math.min(i, s.items.length - 1)) }));
   }, []);
 
-  return { videos, loading, error, search, clear };
+  const next = useCallback(() => {
+    setState((s) => ({
+      ...s,
+      currentIndex: s.items.length === 0 ? 0 : (s.currentIndex + 1) % s.items.length,
+    }));
+  }, []);
+
+  const clear = useCallback(() => {
+    setState({ items: [], loading: false, error: null, currentIndex: 0 });
+  }, []);
+
+  return { ...state, search, setIndex, next, clear };
 }

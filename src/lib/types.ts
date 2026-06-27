@@ -1,96 +1,119 @@
-// ─── POV Types ────────────────────────────────────────────────────────────────
+// ─── Place Categories (from DropPin) ──────────────────────────────────────
 
-export type PovType =
-  | 'car'
-  | 'motorbike'
-  | 'walking'
-  | 'train'
-  | 'mrt'
-  | 'all';
+export type CategoryId = 'all' | 'food' | 'drinks' | 'entertainment' | 'shopping' | 'hotels';
+
+export interface Category {
+  id: CategoryId;
+  label: string;
+  emoji: string;
+  color: string;
+  placeTypes: string[];
+  ytTerms: string[];
+}
+
+export const CATEGORIES: Category[] = [
+  { id: 'all', label: 'All', emoji: '\u{1F525}', color: '#f97316', placeTypes: ['restaurant','cafe','bar','shopping_mall','tourist_attraction','lodging'], ytTerms: ['kuliner','street food','review','viral'] },
+  { id: 'food', label: 'Food', emoji: '\u{1F35C}', color: '#f97316', placeTypes: ['restaurant','cafe','bakery'], ytTerms: ['kuliner','street food','makan','food review','warung'] },
+  { id: 'drinks', label: 'Drinks', emoji: '\u{1F9CB}', color: '#8b5cf6', placeTypes: ['bar','cafe','night_club'], ytTerms: ['kafe','cafe tour','coffee shop','minuman','boba'] },
+  { id: 'entertainment', label: 'Fun', emoji: '\u{1F3AD}', color: '#ec4899', placeTypes: ['movie_theater','amusement_park','museum','tourist_attraction','night_club','bowling_alley'], ytTerms: ['hiburan','wisata','tempat seru','hidden gem'] },
+  { id: 'shopping', label: 'Shopping', emoji: '\u{1F6CD}\uFE0F', color: '#3b82f6', placeTypes: ['shopping_mall','clothing_store','department_store','supermarket'], ytTerms: ['belanja','mall','thrift','pasar'] },
+  { id: 'hotels', label: 'Stay', emoji: '\u{1F3E8}', color: '#14b8a6', placeTypes: ['lodging'], ytTerms: ['hotel review','staycation','penginapan'] },
+];
+
+// ─── Street Mood Tags ──────────────────────────────────────────────────────
+
+export type MoodTag =
+  | 'night_scene'
+  | 'best_in_rain'
+  | 'quiet_local'
+  | 'energetic'
+  | 'old_jakarta'
+  | 'golden_hour';
+
+export const MOOD_TAGS: Record<MoodTag, { label: string; emoji: string }> = {
+  night_scene:  { label: 'Night scene',      emoji: '\u{1F319}' },
+  best_in_rain: { label: 'Best in the rain', emoji: '\u2614\uFE0F' },
+  quiet_local:  { label: 'Quiet & local',    emoji: '\u{1F9D8}' },
+  energetic:    { label: 'Energetic',        emoji: '\u{1F525}' },
+  old_jakarta:  { label: 'Old Jakarta feel', emoji: '\u{1F570}\uFE0F' },
+  golden_hour:  { label: 'Golden hour',      emoji: '\u{1F305}' },
+};
+
+// Infer mood tags from place types + video title keywords
+export function inferMoodTags(types: string[], videoTitles: string[] = []): MoodTag[] {
+  const tags = new Set<MoodTag>();
+  const allText = [...types, ...videoTitles].join(' ').toLowerCase();
+  if (allText.includes('night') || allText.includes('malam') || allText.includes('bar')) tags.add('night_scene');
+  if (allText.includes('rain') || allText.includes('hujan')) tags.add('best_in_rain');
+  if (allText.includes('quiet') || allText.includes('local') || allText.includes('sepi')) tags.add('quiet_local');
+  if (allText.includes('market') || allText.includes('pasar') || allText.includes('busy') || allText.includes('ramai')) tags.add('energetic');
+  if (allText.includes('heritage') || allText.includes('colonial') || allText.includes('tua') || allText.includes('kota')) tags.add('old_jakarta');
+  if (allText.includes('golden') || allText.includes('sunset') || allText.includes('senja')) tags.add('golden_hour');
+  return Array.from(tags).slice(0, 3);
+}
+
+// ─── Place (Google Places result) ─────────────────────────────────────────
+
+export interface Place {
+  id: string;
+  name: string;
+  vicinity: string;
+  rating: number;
+  userRatingsTotal: number;
+  priceLevel?: number;
+  types: string[];
+  photoRef?: string;
+  openNow?: boolean;
+  lat: number;
+  lng: number;
+  category: CategoryId;
+  moodTags?: MoodTag[];
+}
+
+// ─── POV Types (from WanderStreet) ────────────────────────────────────────
+
+export type PovType = 'all' | 'car' | 'motorbike' | 'walking' | 'train' | 'mrt';
 
 export interface PovOption {
   id: PovType;
   label: string;
   emoji: string;
-  color: string; // hex, used for map pin colour
-  searchTerms: string[]; // appended to YouTube query
+  color: string;
+  keywords: string[];
 }
 
 export const POV_OPTIONS: PovOption[] = [
-  {
-    id: 'all',
-    label: 'All',
-    emoji: '🌐',
-    color: '#6c63ff',
-    searchTerms: ['POV', 'dashcam', 'street view', 'walking tour'],
-  },
-  {
-    id: 'car',
-    label: 'Car / Dashcam',
-    emoji: '🚗',
-    color: '#f59e0b',
-    searchTerms: ['dashcam', 'driving', 'car POV', 'drive through'],
-  },
-  {
-    id: 'motorbike',
-    label: 'Motorbike',
-    emoji: '🛵',
-    color: '#ef4444',
-    searchTerms: ['motorbike', 'motorcycle', 'scooter ride', 'ojek POV'],
-  },
-  {
-    id: 'walking',
-    label: 'Walking',
-    emoji: '🚶',
-    color: '#22c55e',
-    searchTerms: ['walking tour', 'walk through', 'pedestrian POV', 'street walk'],
-  },
-  {
-    id: 'train',
-    label: 'Train / KRL',
-    emoji: '🚆',
-    color: '#3b82f6',
-    searchTerms: ['KRL', 'commuter line', 'train ride', 'kereta'],
-  },
-  {
-    id: 'mrt',
-    label: 'MRT / Metro',
-    emoji: '🚇',
-    color: '#8b5cf6',
-    searchTerms: ['MRT Jakarta', 'metro ride', 'LRT Jakarta', 'subway'],
-  },
+  { id: 'all',       label: 'All POV',   emoji: '\u{1F3A5}', color: '#7c6aff', keywords: [] },
+  { id: 'walking',   label: 'Walking',   emoji: '\u{1F6B6}', color: '#22c55e', keywords: ['walk','jalan kaki','on foot','pedestrian','pejalan'] },
+  { id: 'motorbike', label: 'Motorbike', emoji: '\u{1F3CD}\uFE0F', color: '#f97316', keywords: ['motor','ojek','motorbike','motorcycle','riding'] },
+  { id: 'car',       label: 'Car',       emoji: '\u{1F697}', color: '#3b82f6', keywords: ['car','mobil','drive','driving','dashcam'] },
+  { id: 'train',     label: 'Train',     emoji: '\u{1F686}', color: '#8b5cf6', keywords: ['train','kereta','krl','commuter','rail'] },
+  { id: 'mrt',       label: 'MRT',       emoji: '\u{1F687}', color: '#ec4899', keywords: ['mrt','lrt','metro','subway'] },
 ];
 
-// ─── Time of Day ──────────────────────────────────────────────────────────────
+// ─── Time of Day ───────────────────────────────────────────────────────────
 
-export type TimeOfDay =
-  | 'all'
-  | 'dawn'
-  | 'morning'
-  | 'afternoon'
-  | 'golden'
-  | 'night'
-  | 'late_night';
+export type TimeOfDay = 'all' | 'dawn' | 'morning' | 'afternoon' | 'golden' | 'night' | 'late_night';
 
 export interface TimeOption {
   id: TimeOfDay;
   label: string;
   emoji: string;
-  range: string;
-  searchTerms: string[];
+  keywords: string[];
+  hours?: [number, number];
 }
 
 export const TIME_OPTIONS: TimeOption[] = [
-  { id: 'all', label: 'Any time', emoji: '🕐', range: '', searchTerms: [] },
-  { id: 'dawn', label: 'Dawn', emoji: '🌅', range: '5–7am', searchTerms: ['dawn', 'sunrise', 'subuh'] },
-  { id: 'morning', label: 'Morning', emoji: '☀️', range: '7–11am', searchTerms: ['morning', 'pagi'] },
-  { id: 'afternoon', label: 'Afternoon', emoji: '🌤️', range: '11am–4pm', searchTerms: ['afternoon', 'siang'] },
-  { id: 'golden', label: 'Golden Hour', emoji: '🌇', range: '4–7pm', searchTerms: ['golden hour', 'sunset', 'sore'] },
-  { id: 'night', label: 'Night', emoji: '🌃', range: '7pm–12am', searchTerms: ['night', 'malam', 'nighttime'] },
-  { id: 'late_night', label: 'Late Night', emoji: '🌙', range: '12–5am', searchTerms: ['late night', 'midnight', 'dini hari'] },
+  { id: 'all',        label: 'Any time',    emoji: '\u{1F551}', keywords: [] },
+  { id: 'dawn',       label: 'Dawn',        emoji: '\u{1F305}', keywords: ['dawn','subuh','sunrise','pagi buta'], hours: [4,7] },
+  { id: 'morning',    label: 'Morning',     emoji: '\u2600\uFE0F', keywords: ['morning','pagi','siang'], hours: [7,12] },
+  { id: 'afternoon',  label: 'Afternoon',   emoji: '\u{1F31E}', keywords: ['afternoon','siang','midday'], hours: [12,17] },
+  { id: 'golden',     label: 'Golden Hour', emoji: '\u{1F307}', keywords: ['golden hour','sunset','senja','dusk'], hours: [17,19] },
+  { id: 'night',      label: 'Night',       emoji: '\u{1F319}', keywords: ['night','malam','evening'], hours: [19,23] },
+  { id: 'late_night', label: 'Late Night',  emoji: '\u{1F303}', keywords: ['late night','midnight','dini hari','tengah malam'], hours: [23,4] },
 ];
 
-// ─── YouTube Video Result ─────────────────────────────────────────────────────
+// ─── Video Result ──────────────────────────────────────────────────────────
 
 export interface VideoResult {
   id: string;
@@ -98,73 +121,80 @@ export interface VideoResult {
   channelTitle: string;
   publishedAt: string;
   thumbnail: string;
+  viewCount?: string;
   description: string;
-  lat?: number;
-  lng?: number;
+  // POV classification
   povType: PovType;
+  // Time of day classification
+  timeOfDay?: TimeOfDay;
+  // Duration
   duration?: string;
+  // For Memory Walk — the year this video was published
+  publishedYear?: number;
 }
 
-// ─── Map Pin ──────────────────────────────────────────────────────────────────
+// ─── Memory Pin (I Was Here) ──────────────────────────────────────────────
 
-export interface MapPin {
+export interface MemoryPin {
   id: string;
   lat: number;
   lng: number;
   label: string;
-  videos: VideoResult[];
-  povType: PovType;
+  areaName: string;
+  visitedYear: number;
+  note: string;
+  savedAt: number; // timestamp
 }
 
-// ─── Ambient Sound ────────────────────────────────────────────────────────────
+// ─── Ambient Sound ────────────────────────────────────────────────────────
 
-export type SoundCategory = 'street' | 'transport' | 'cultural' | 'nature';
+export type AmbientCategory = 'street' | 'nature' | 'rain' | 'cafe';
 
-export interface SoundTrack {
+export interface AmbientTrack {
   id: string;
-  category: SoundCategory;
   label: string;
   emoji: string;
-  // In a real deployment, host these in /public/sounds/
-  // Using free CC0 audio or generate with ElevenLabs / Freesound
   src: string;
+  category: AmbientCategory;
 }
 
-export const SOUND_CATEGORIES: { id: SoundCategory; label: string; emoji: string }[] = [
-  { id: 'street', label: 'Street / City', emoji: '🏙️' },
-  { id: 'transport', label: 'Transport', emoji: '🚉' },
-  { id: 'cultural', label: 'Cultural', emoji: '🕌' },
-  { id: 'nature', label: 'Nature / Markets', emoji: '🌿' },
+export const AMBIENT_TRACKS: AmbientTrack[] = [
+  { id: 'street_busy',   label: 'Busy Street',    emoji: '\u{1F699}', src: '/sounds/street-busy.mp3',   category: 'street' },
+  { id: 'street_night',  label: 'Night Street',   emoji: '\u{1F319}', src: '/sounds/street-night.mp3',  category: 'street' },
+  { id: 'market',        label: 'Market Chatter', emoji: '\u{1F6D2}', src: '/sounds/market.mp3',        category: 'street' },
+  { id: 'traffic',       label: 'Light Traffic',  emoji: '\u{1F6A6}', src: '/sounds/traffic.mp3',       category: 'street' },
+  { id: 'birds',         label: 'Birds',          emoji: '\u{1F426}', src: '/sounds/birds.mp3',         category: 'nature' },
+  { id: 'river',         label: 'River',          emoji: '\u{1F30A}', src: '/sounds/river.mp3',         category: 'nature' },
+  { id: 'crickets',      label: 'Crickets',       emoji: '\u{1F997}', src: '/sounds/crickets.mp3',      category: 'nature' },
+  { id: 'rain_light',    label: 'Light Rain',     emoji: '\u{1F326}\uFE0F', src: '/sounds/rain-light.mp3', category: 'rain' },
+  { id: 'rain_heavy',    label: 'Heavy Rain',     emoji: '\u26C8\uFE0F', src: '/sounds/rain-heavy.mp3', category: 'rain' },
+  { id: 'thunder',       label: 'Thunder',        emoji: '\u26A1', src: '/sounds/thunder.mp3',          category: 'rain' },
+  { id: 'cafe_indoor',   label: 'Cafe Buzz',      emoji: '\u2615', src: '/sounds/cafe-indoor.mp3',      category: 'cafe' },
+  { id: 'gamelan',       label: 'Gamelan',        emoji: '\u{1F3B5}', src: '/sounds/gamelan.mp3',       category: 'cafe' },
 ];
 
-export const SOUND_TRACKS: SoundTrack[] = [
-  // Street / City
-  { id: 'jakarta_traffic', category: 'street', label: 'Jakarta Traffic', emoji: '🚗', src: '/sounds/jakarta_traffic.mp3' },
-  { id: 'motorbike_swarm', category: 'street', label: 'Motorbike Swarm', emoji: '🛵', src: '/sounds/motorbike_swarm.mp3' },
-  { id: 'rain_zinc', category: 'street', label: 'Rain on Zinc Roof', emoji: '🌧️', src: '/sounds/rain_zinc.mp3' },
-  { id: 'street_vendor', category: 'street', label: 'Street Vendor Calls', emoji: '📢', src: '/sounds/street_vendor.mp3' },
-  // Transport
-  { id: 'krl_station', category: 'transport', label: 'KRL Announcement', emoji: '🔊', src: '/sounds/krl_station.mp3' },
-  { id: 'mrt_chime', category: 'transport', label: 'MRT Departure Chime', emoji: '🚇', src: '/sounds/mrt_chime.mp3' },
-  { id: 'train_wheels', category: 'transport', label: 'Train Wheels', emoji: '🚆', src: '/sounds/train_wheels.mp3' },
-  { id: 'station_crowd', category: 'transport', label: 'Station Crowd', emoji: '👥', src: '/sounds/station_crowd.mp3' },
-  // Cultural
-  { id: 'azan', category: 'cultural', label: 'Azan (Call to Prayer)', emoji: '🕌', src: '/sounds/azan.mp3' },
-  { id: 'gamelan', category: 'cultural', label: 'Gamelan Music', emoji: '🎼', src: '/sounds/gamelan.mp3' },
-  { id: 'dangdut', category: 'cultural', label: 'Dangdut from Speaker', emoji: '🎵', src: '/sounds/dangdut.mp3' },
-  { id: 'warung_tv', category: 'cultural', label: 'Warung TV Background', emoji: '📺', src: '/sounds/warung_tv.mp3' },
-  // Nature / Markets
-  { id: 'pasar_malam', category: 'nature', label: 'Night Market Buzz', emoji: '🏮', src: '/sounds/pasar_malam.mp3' },
-  { id: 'warung_kitchen', category: 'nature', label: 'Warung Kitchen Sizzle', emoji: '🍳', src: '/sounds/warung_kitchen.mp3' },
-  { id: 'ocean_waves', category: 'nature', label: 'Ocean Waves (Bali)', emoji: '🌊', src: '/sounds/ocean_waves.mp3' },
-  { id: 'morning_market', category: 'nature', label: 'Morning Market Bustle', emoji: '🧺', src: '/sounds/morning_market.mp3' },
-];
-
-// ─── Misc ─────────────────────────────────────────────────────────────────────
+// ─── Search State ─────────────────────────────────────────────────────────
 
 export interface SearchState {
   lat: number;
   lng: number;
   label: string;
+  areaName: string;
   radiusMeters: number;
 }
+
+// ─── Panel Tabs ───────────────────────────────────────────────────────────
+
+export type PanelTab = 'places' | 'streets' | 'trending' | 'memories';
+
+// ─── Backwards-compat aliases ──────────────────────────────────────────────
+
+export type SoundCategory = AmbientCategory;
+export const SOUND_TRACKS = AMBIENT_TRACKS;
+
+export const SOUND_CATEGORIES: { id: AmbientCategory; label: string; emoji: string }[] = [
+  { id: 'street', label: 'Street',  emoji: '🌆' },
+  { id: 'nature', label: 'Nature',  emoji: '🌿' },
+  { id: 'rain',   label: 'Rain',    emoji: '🌧️' },
+  { id: 'cafe',   label: 'Cafe',    emoji: '☕' },
+];

@@ -9,20 +9,13 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          bg: '#0f0f14',
-          panel: '#16161e',
-          card: '#1e1e2a',
-          border: '#2a2a3a',
-          accent: '#6c63ff',
-          accentHover: '#857dff',
-          gold: '#f0a500',
-          text: '#e8e8f0',
-          muted: '#8888a8',
-        },
-      },
-      fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        'brand-bg':     'var(--brand-bg)',
+        'brand-card':   'var(--brand-card)',
+        'brand-border': 'var(--brand-border)',
+        'brand-accent': 'var(--brand-accent)',
+        'brand-muted':  'var(--brand-muted)',
+        'brand-gold':   'var(--brand-gold)',
+        'brand-text':   'var(--brand-text)',
       },
     },
   },
